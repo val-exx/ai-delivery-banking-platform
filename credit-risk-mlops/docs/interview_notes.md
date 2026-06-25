@@ -53,3 +53,11 @@ This separates model training from inference and makes the model usable by other
 I used FastAPI `TestClient` to test the API without manually starting the server. The tests verify that `/health` returns a valid service status and that `/predict` accepts a valid credit application payload and returns the expected prediction fields.
 
 This helps catch regressions when the API or inference logic changes.
+
+## How did I containerize the API?
+
+I created a Dockerfile for the FastAPI prediction service using Python 3.10. The image installs the project dependencies, includes the trained model artifact, sets the correct `PYTHONPATH`, and starts Uvicorn on port 8000.
+
+I tested the container by mapping host port 8001 to container port 8000 and calling `/health`, `/docs`, and `/predict`.
+
+This makes the service more reproducible and prepares it for future deployment on Kubernetes or OpenShift.

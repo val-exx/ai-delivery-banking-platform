@@ -13,7 +13,7 @@ Implemented features:
 - derived `debt_to_income` feature;
 - probabilistic binary `default` target;
 - CSV export for downstream ML pipelines;
-- unit tests for schema, ranges, reproducibility, and file output.
+- unit tests for schema, ranges, reproducibility, and file output;
 - EDA utilities for dataset validation;
 - baseline Logistic Regression model;
 - configurable decision threshold;
@@ -125,6 +125,36 @@ Example response:
 }
 ```
 
+## Docker
+
+The FastAPI prediction service can be packaged and run with Docker.
+
+Build the image from the repository root:
+
+```powershell
+docker build -f credit-risk-mlops/Dockerfile -t credit-risk-mlops-api .
+```
+
+Run the container:
+
+```powershell
+docker run --rm -p 8001:8000 credit-risk-mlops-api
+```
+
+Healthcheck:
+
+```text
+http://127.0.0.1:8001/health
+```
+
+Interactive API docs:
+
+```text
+http://127.0.0.1:8001/docs
+```
+
+The container includes the trained `baseline_logistic_regression.joblib` model artifact and serves predictions through the `/predict` endpoint.
+
 ## Run Tests
 
 ```powershell
@@ -148,3 +178,5 @@ python -m unittest discover -s credit-risk-mlops/tests
 - Pydantic
 - model serving
 - API testing
+- Docker
+- containerized model serving 
