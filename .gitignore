@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Virtual environments
+.venv/
+venv/
+
+# Local data and secrets
+.env
+.env.*
+data/raw/
+data/interim/
+data/processed/
+*.sqlite
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+.venv*/
+*.egg-info/
+mlruns/
+credit-risk-mlops/mlruns/
+credit-risk-mlops/tmp/
+tmp/
+

@@ -1,0 +1,12 @@
+.venv/
+.venv*/
+__pycache__/
+*.pyc
+.git/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+credit-risk-mlops/mlruns/
+credit-risk-mlops/tmp/
+data/
+tmp/
