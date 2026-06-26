@@ -61,3 +61,21 @@ I created a Dockerfile for the FastAPI prediction service using Python 3.10. The
 I tested the container by mapping host port 8001 to container port 8000 and calling `/health`, `/docs`, and `/predict`.
 
 This makes the service more reproducible and prepares it for future deployment on Kubernetes or OpenShift.
+
+## How did I persist prediction audits?
+
+I added a PostgreSQL-backed audit trail for model predictions. After each successful `/predict` request, the API stores the input features, default probability, predicted label, decision threshold, and timestamp in the `prediction_audit` table.
+
+I used SQLAlchemy as the ORM and psycopg as the PostgreSQL driver. Persisting predictions supports traceability, debugging, and future monitoring of model behavior.
+
+## How did I orchestrate the API and database?
+
+I used Docker Compose to run the FastAPI service and PostgreSQL database as separate containers. The API receives its database connection string through the `DATABASE_URL` environment variable and connects to the database through the internal Docker service name `db`.
+
+This setup separates responsibilities: the API serves predictions, while PostgreSQL persists audit data.
+
+## How did I make service startup more reliable?
+
+I configured a PostgreSQL health check using `pg_isready` and made the API depend on the database becoming healthy.
+
+This prevents the API from starting before PostgreSQL is ready to accept connections. It is a small but important reliability practice for containerized services.

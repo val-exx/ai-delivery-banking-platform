@@ -4,7 +4,7 @@ This module implements the first stages of an end-to-end credit risk machine lea
 
 ## Current Scope
 
-The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, and a FastAPI prediction service.
+The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, and Docker Compose orchestration.
 
 Implemented features:
 
@@ -20,7 +20,10 @@ Implemented features:
 - MLflow experiment tracking;
 - persisted scikit-learn pipeline with joblib;
 - FastAPI prediction service;
-- automated API tests.
+- automated API tests;
+- PostgreSQL-backed prediction audit trail;
+- Docker Compose orchestration for the API and database;
+- database health checks to coordinate service startup.
 
 ## Dataset Schema
 
@@ -155,6 +158,24 @@ http://127.0.0.1:8001/docs
 
 The container includes the trained `baseline_logistic_regression.joblib` model artifact and serves predictions through the `/predict` endpoint.
 
+## Docker Compose and Prediction Auditing
+
+The API and PostgreSQL database can be run together with Docker Compose:
+
+```powershell
+docker compose up --build
+```
+
+The API is available at:
+```
+http://127.0.0.1:8001/docs
+```
+The API container receives the database connection string through the `DATABASE_URL` environment variable. Inside the Docker Compose network, the API connects to PostgreSQL using the service name `db`.
+
+Each successful `/predict` request is stored in the `prediction_audit` table. The audit record includes the input features, predicted default probability, predicted label, decision threshold, and creation timestamp.
+
+PostgreSQL exposes a health check based on `pg_isready`. Docker Compose starts the API only after the database service becomes healthy.
+
 ## Run Tests
 
 ```powershell
@@ -180,3 +201,9 @@ python -m unittest discover -s credit-risk-mlops/tests
 - API testing
 - Docker
 - containerized model serving 
+- PostgreSQL
+- SQLAlchemy
+- psycopg
+- Docker Compose
+- service health checks
+- prediction audit logging

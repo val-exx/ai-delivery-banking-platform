@@ -1,15 +1,22 @@
 from __future__ import annotations
 
+import os
+
 from pathlib import Path
 
 from fastapi import FastAPI
 from pydantic import BaseModel, Field
 
 from credit_risk_mlops.inference import predict_default_label, predict_default_probability
+import os
 
+from credit_risk_mlops.database import create_session_factory, save_prediction_audit
 
 MODEL_PATH = Path("credit-risk-mlops/models/baseline_logistic_regression.joblib")
 THRESHOLD = 0.3
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+SessionFactory = create_session_factory(DATABASE_URL) if DATABASE_URL else None
 
 app = FastAPI(title="Credit Risk MLOps API")
 
@@ -44,6 +51,17 @@ def predict(application: CreditApplication) -> PredictionResponse:
 
     probability = predict_default_probability(MODEL_PATH, application_data)
     label = predict_default_label(MODEL_PATH, application_data, threshold=THRESHOLD)
+
+
+    if SessionFactory is not None:
+        with SessionFactory() as session:
+            save_prediction_audit(
+                session=session,
+                application_data=application_data,
+                default_probability=probability,
+                default_label=label,
+                threshold=THRESHOLD,
+            )
 
     return PredictionResponse(
         default_probability=probability,
