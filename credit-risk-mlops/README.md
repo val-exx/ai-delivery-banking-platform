@@ -4,7 +4,7 @@ This module implements the first stages of an end-to-end credit risk machine lea
 
 ## Current Scope
 
-The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, and Docker Compose orchestration.
+The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Docker Compose orchestration, and basic Kubernetes deployment manifests.
 
 Implemented features:
 
@@ -23,7 +23,11 @@ Implemented features:
 - automated API tests;
 - PostgreSQL-backed prediction audit trail;
 - Docker Compose orchestration for the API and database;
-- database health checks to coordinate service startup.
+- database health checks to coordinate service startup;
+- Kubernetes `Deployment` and `Service` manifests for the API;
+- GitHub Container Registry image publishing;
+- Kubernetes private registry authentication with `imagePullSecrets`;
+- local Kubernetes inference testing through `kubectl port-forward`.
 
 ## Dataset Schema
 
@@ -176,6 +180,143 @@ Each successful `/predict` request is stored in the `prediction_audit` table. Th
 
 PostgreSQL exposes a health check based on `pg_isready`. Docker Compose starts the API only after the database service becomes healthy.
 
+## Kubernetes Manifests
+
+This module includes a minimal Kubernetes configuration for the FastAPI inference service:
+
+| File | Purpose |
+| --- | --- |
+| `k8s/api-deployment.yaml` | Defines how Kubernetes should run and keep the API container alive |
+| `k8s/api-service.yaml` | Exposes the API through a stable Kubernetes Service |
+
+The Kubernetes `Deployment` describes the desired application state:
+
+- run one replica of the credit risk API;
+- pull the API image from GitHub Container Registry;
+- use the `ghcr.io/val-exx/credit-risk-mlops-api:latest` Docker image;
+- authenticate to the private registry with the `ghcr-login` image pull secret;
+- expose container port `8000`, where Uvicorn serves FastAPI.
+
+The Kubernetes `Service` exposes the API Pod through a stable network abstraction:
+
+- `selector: app: credit-risk-api` connects the Service to the Pods created by the Deployment;
+- `targetPort: 8000` forwards traffic to the FastAPI container;
+- `nodePort: 30080` is intended for local cluster access through a NodePort.
+
+### Publish the API Image
+
+Kubernetes should pull the API image from a registry instead of relying on a local Docker image. The image was tagged and pushed to GitHub Container Registry:
+
+```powershell
+docker tag credit-risk-mlops-api:latest ghcr.io/val-exx/credit-risk-mlops-api:latest
+docker login ghcr.io -u val-exx
+docker push ghcr.io/val-exx/credit-risk-mlops-api:latest
+```
+
+The GitHub token used for `docker login` must not be committed to the repository.
+
+### Configure Registry Authentication
+
+If the GitHub Container Registry package is private, Kubernetes needs credentials to pull the image. A Docker registry secret can be created locally:
+
+```powershell
+kubectl create secret docker-registry ghcr-login `
+  --docker-server=ghcr.io `
+  --docker-username=val-exx `
+  --docker-password=<github-token>
+```
+
+The Deployment references this secret through:
+
+```yaml
+imagePullSecrets:
+  - name: ghcr-login
+```
+
+### Deploy to Local Kubernetes
+
+Apply the manifests from the repository root:
+
+```powershell
+kubectl apply -f credit-risk-mlops/k8s/api-deployment.yaml
+kubectl apply -f credit-risk-mlops/k8s/api-service.yaml
+```
+
+Useful inspection commands:
+
+```powershell
+kubectl get deployments
+kubectl get pods
+kubectl get services
+kubectl describe pod <pod-name>
+```
+
+Expected result:
+
+```text
+credit-risk-api-...   1/1   Running
+```
+
+### Test Through Port Forwarding
+
+In this Docker Desktop setup, the `NodePort` was created successfully but was not reachable directly through `127.0.0.1:30080`. For local testing, `kubectl port-forward` was used:
+
+```powershell
+kubectl port-forward service/credit-risk-api-service 8081:80
+```
+
+This creates a temporary tunnel:
+
+```text
+localhost:8081 -> Kubernetes Service port 80 -> FastAPI container port 8000
+```
+
+Healthcheck:
+
+```text
+http://127.0.0.1:8081/health
+```
+
+Prediction request:
+
+```powershell
+$body = @{
+  age = 42
+  annual_income = 38000
+  employment_years = 6
+  loan_amount = 22000
+  loan_term_months = 60
+  credit_score = 540
+  existing_debt = 11000
+} | ConvertTo-Json
+
+Invoke-RestMethod `
+  -Uri "http://127.0.0.1:8081/predict" `
+  -Method Post `
+  -ContentType "application/json" `
+  -Body $body
+```
+
+Example response:
+
+```text
+default_probability default_label threshold
+------------------- ------------- ---------
+0.4299264096226507              1       0.3
+```
+
+### Local Docker Desktop Debugging Notes
+
+During local testing with Docker Desktop Kubernetes, the API Pod reached `ErrImageNeverPull` because the Kubernetes node did not see the locally built Docker image:
+
+```text
+Container image "credit-risk-mlops-api:latest" is not present with pull policy of Never
+```
+
+This is an image visibility issue between the local Docker image store and the Kubernetes cluster image store. It was solved by pushing the image to GitHub Container Registry and updating the Deployment to reference the registry image.
+
+After switching to GHCR, the Pod reached `ImagePullBackOff` with `401 Unauthorized`. This meant Kubernetes could find the registry image, but it was trying to pull it anonymously. The issue was solved by creating a Kubernetes Docker registry secret and referencing it with `imagePullSecrets`.
+
 ## Run Tests
 
 ```powershell
@@ -207,3 +348,12 @@ python -m unittest discover -s credit-risk-mlops/tests
 - Docker Compose
 - service health checks
 - prediction audit logging
+- Kubernetes
+- kubectl
+- Deployment manifests
+- Service manifests
+- GitHub Container Registry
+- Kubernetes Secrets
+- imagePullSecrets
+- port-forwarding
+- local Kubernetes deployment debugging

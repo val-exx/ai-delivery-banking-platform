@@ -79,3 +79,91 @@ This setup separates responsibilities: the API serves predictions, while Postgre
 I configured a PostgreSQL health check using `pg_isready` and made the API depend on the database becoming healthy.
 
 This prevents the API from starting before PostgreSQL is ready to accept connections. It is a small but important reliability practice for containerized services.
+
+## How did I start using Kubernetes?
+
+I added a minimal Kubernetes configuration for the FastAPI inference service. The goal was not to train the model on Kubernetes, but to describe how the already containerized API could be deployed and exposed in a cluster.
+
+I created two manifests:
+
+- `api-deployment.yaml`, which tells Kubernetes to run one replica of the API container and keep it alive;
+- `api-service.yaml`, which exposes the API through a stable Service and forwards traffic to the FastAPI container port.
+
+The important concept I learned is that a Kubernetes `Deployment` manages application replicas, while a Kubernetes `Service` provides stable network access to the Pods created by that Deployment.
+
+## What Kubernetes issue did I debug locally?
+
+When I first applied the Deployment on Docker Desktop Kubernetes, the Pod did not become ready. By using `kubectl get pods` and `kubectl describe pod`, I found the error:
+
+```text
+Container image "credit-risk-mlops-api:latest" is not present with pull policy of Never
+```
+
+This means the Kubernetes node could not see the locally built Docker image. The YAML configuration was structurally correct, but the cluster did not have access to the image.
+
+This taught me that Kubernetes does not run source code directly. It runs container images, and the cluster must be able to pull or access the exact image referenced in the Deployment.
+
+## How did I solve image availability for Kubernetes?
+
+I solved the image availability problem by publishing the Docker image to GitHub Container Registry.
+
+I tagged the local image with a registry name:
+
+```text
+ghcr.io/val-exx/credit-risk-mlops-api:latest
+```
+
+Then I authenticated Docker to GHCR and pushed the image. This changed the deployment flow from relying on a local Docker image to using a registry-based image that Kubernetes could pull.
+
+The deployment flow became:
+
+```text
+Dockerfile
+  -> Docker image
+  -> GitHub Container Registry
+  -> Kubernetes Deployment
+  -> Running Pod
+```
+
+## How did I handle private registry authentication?
+
+After switching the Deployment to use the GHCR image, Kubernetes returned a `401 Unauthorized` error while pulling the image. This happened because Docker was authenticated on my machine, but Kubernetes did not automatically inherit those credentials.
+
+I created a Kubernetes Docker registry secret named `ghcr-login` and referenced it in the Deployment with `imagePullSecrets`.
+
+This taught me that private container registries require explicit authentication inside Kubernetes.
+
+## How did I expose and test the API in Kubernetes?
+
+I created a Kubernetes `Service` of type `NodePort` to expose the FastAPI Pod. The Service maps traffic from Kubernetes to the container port where Uvicorn is running.
+
+In my Docker Desktop setup, the NodePort was created but was not directly reachable from `127.0.0.1`. To test the service locally, I used:
+
+```text
+kubectl port-forward service/credit-risk-api-service 8081:80
+```
+
+This created a temporary tunnel from my local machine to the Kubernetes Service. I verified both:
+
+- `/health`, to check that the API was alive;
+- `/predict`, to check that the API could load the model and return an ML prediction.
+
+The prediction request returned a default probability, a default label, and the model threshold, proving that the inference service was working through Kubernetes.
+
+## What would I improve in a production-like Kubernetes setup?
+
+In a real project, I would use immutable image tags instead of `latest`, configure readiness and liveness probes, externalize configuration through ConfigMaps and Secrets, deploy PostgreSQL as a managed database or with a dedicated Kubernetes setup, and use a proper ingress controller instead of local port-forwarding.
+
+For example, I would reference an immutable image such as:
+
+```text
+ghcr.io/val-exx/credit-risk-mlops-api:2026-06-28
+```
+
+This would make deployments easier to reproduce and roll back.
+
+## How would I explain the Kubernetes part in an interview?
+
+I would say:
+
+> I containerized a FastAPI machine learning inference service with Docker and deployed it on local Kubernetes. I pushed the image to GitHub Container Registry, configured a Kubernetes image pull secret for private registry authentication, used a Deployment to manage the API Pod, exposed it with a Service, and tested `/health` and `/predict` through `kubectl port-forward`. During the process, I debugged `ErrImageNeverPull`, `ImagePullBackOff`, and a `401 Unauthorized` pull error, which helped me understand how Kubernetes accesses container images and private registries.

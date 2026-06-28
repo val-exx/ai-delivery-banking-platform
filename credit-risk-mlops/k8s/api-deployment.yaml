@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: credit-risk-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: credit-risk-api
+  template:
+    metadata:
+      labels:
+        app: credit-risk-api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-login
+      containers:
+        - name: credit-risk-api
+          image: ghcr.io/val-exx/credit-risk-mlops-api:latest
+          ports:
+            - containerPort: 8000
