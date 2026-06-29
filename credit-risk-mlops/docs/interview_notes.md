@@ -140,6 +140,41 @@ KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 
 After calling `/predict` through Swagger, Kafka UI showed a new `prediction_created` event in the `prediction-events` topic. This confirmed that the API, Kafka producer, broker, topic, and UI were connected correctly.
 
+## How did I use Spark?
+
+I added a PySpark batch monitoring job for prediction events. The job reads prediction events from a JSON Lines file, loads them into a Spark DataFrame, computes aggregate monitoring metrics, and writes a small JSON report.
+
+The metrics include:
+
+- number of predictions;
+- average default probability;
+- default rate;
+- average decision threshold.
+
+This simulates a Databricks-style monitoring workflow where production prediction logs could be processed on a schedule.
+
+## Why did Spark require Java?
+
+PySpark is the Python API for Spark, but the Spark engine runs on the JVM. When I first ran the monitoring test, Spark failed because Java was missing. Then it failed with Java 8 because the installed Spark version required Java 17.
+
+I installed and configured Temurin JDK 17 and set `JAVA_HOME` so PySpark could start the Java gateway.
+
+This taught me that Spark local development requires both Python and a compatible Java runtime, while managed platforms like Databricks usually provide this runtime environment.
+
+## Why did I configure the PySpark Python executable?
+
+After Java was fixed, Spark still failed because the Python worker could not start. Spark workers were trying to call a generic `python` command instead of the Python interpreter from my virtual environment.
+
+I fixed this by setting `PYSPARK_DRIVER_PYTHON` and `PYSPARK_PYTHON` from `sys.executable` in the Spark session setup. This makes Spark use the same Python interpreter as the active virtual environment.
+
+## How did I handle Spark writing on Windows?
+
+Spark successfully computed the monitoring metrics, but local Spark JSON writing failed on Windows with a Hadoop `NativeIO$Windows.access0` error.
+
+To keep the local job reliable, I kept Spark responsible for the aggregation and used standard Python `json.dump` to write the final small `metrics.json` report.
+
+This is a pragmatic local-development choice. In Databricks or a Linux-based Spark environment, Spark writers would normally be used directly for distributed output.
+
 ## How did I start using Kubernetes?
 
 I added a minimal Kubernetes configuration for the FastAPI inference service. The goal was not to train the model on Kubernetes, but to describe how the already containerized API could be deployed and exposed in a cluster.

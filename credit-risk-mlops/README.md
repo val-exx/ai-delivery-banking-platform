@@ -4,7 +4,7 @@ This module implements the first stages of an end-to-end credit risk machine lea
 
 ## Current Scope
 
-The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Kafka prediction events, Docker Compose orchestration, and basic Kubernetes deployment manifests.
+The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Kafka prediction events, Spark-based monitoring metrics, Docker Compose orchestration, and basic Kubernetes deployment manifests.
 
 Implemented features:
 
@@ -24,6 +24,7 @@ Implemented features:
 - PostgreSQL-backed prediction audit trail;
 - Kafka prediction event publishing;
 - Kafka UI for local topic and message inspection;
+- Spark batch monitoring job for prediction events;
 - Docker Compose orchestration for the API and database;
 - database health checks to coordinate service startup;
 - Kubernetes `Deployment` and `Service` manifests for the API;
@@ -272,6 +273,62 @@ The message can then be inspected in Kafka UI under:
 local -> Topics -> prediction-events -> Messages
 ```
 
+## Spark Monitoring Job
+
+The module includes a PySpark batch job that computes monitoring metrics from prediction events stored as JSON Lines.
+
+Input example:
+
+```text
+credit-risk-mlops/data/events/prediction_events.jsonl
+```
+
+Each line is one prediction event:
+
+```json
+{"event_id":"prediction-1","event_type":"prediction_created","default_probability":0.8,"default_label":1,"threshold":0.3}
+```
+
+Run the monitoring job:
+
+```powershell
+$env:JAVA_HOME="C:\Program Files\Eclipse Adoptium\jdk-17.0.19.10-hotspot"
+$env:PATH="$env:JAVA_HOME\bin;$env:PATH"
+$env:PYTHONPATH="credit-risk-mlops/src"
+
+python credit-risk-mlops/scripts/run_monitoring.py
+```
+
+The job computes:
+
+| Metric | Meaning |
+| --- | --- |
+| `prediction_count` | Number of prediction events |
+| `average_default_probability` | Average model default probability |
+| `default_rate` | Average predicted default label |
+| `average_threshold` | Average decision threshold |
+
+Example output:
+
+```json
+{
+  "prediction_count": 3,
+  "average_default_probability": 0.4666666666666666,
+  "default_rate": 0.6666666666666666,
+  "average_threshold": 0.3
+}
+```
+
+The local report is written to:
+
+```text
+credit-risk-mlops/tmp/monitoring_metrics/metrics.json
+```
+
+PySpark requires Java. Local testing used Temurin JDK 17. The code sets `PYSPARK_DRIVER_PYTHON` and `PYSPARK_PYTHON` from the current Python interpreter so Spark workers use the active virtual environment.
+
+On Windows, Spark/Hadoop local JSON writing can fail with `NativeIO$Windows.access0`. To keep the local job reliable, Spark computes the metrics and Python writes the final small `metrics.json` report.
+
 ## Kubernetes Manifests
 
 This module includes a minimal Kubernetes configuration for the FastAPI inference service:
@@ -442,6 +499,9 @@ python -m unittest discover -s credit-risk-mlops/tests
 - Kafka UI
 - event-driven architecture
 - producer events
+- PySpark
+- Spark DataFrames
+- Databricks-ready batch monitoring
 - Docker Compose
 - service health checks
 - prediction audit logging
