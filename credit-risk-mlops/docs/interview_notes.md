@@ -80,6 +80,66 @@ I configured a PostgreSQL health check using `pg_isready` and made the API depen
 
 This prevents the API from starting before PostgreSQL is ready to accept connections. It is a small but important reliability practice for containerized services.
 
+## How did I use Kafka?
+
+I added Kafka to publish prediction events after the API serves a `/predict` request. The API still returns the prediction synchronously to the caller, but it also emits an asynchronous event to the `prediction-events` Kafka topic.
+
+The flow is:
+
+```text
+POST /predict
+  -> FastAPI validates the request
+  -> the scikit-learn model returns a probability and label
+  -> PostgreSQL stores an audit record
+  -> Kafka receives a prediction_created event
+```
+
+This introduces an event-driven pattern. Other systems could later consume the Kafka topic for monitoring, dashboards, model drift analysis, alerting, or data lake ingestion without calling the API directly.
+
+## What Kafka concepts did I learn?
+
+I learned the basic Kafka roles:
+
+- a broker is the Kafka server that stores and serves messages;
+- a topic is a named stream of events, such as `prediction-events`;
+- a producer writes messages to a topic;
+- a consumer reads messages from a topic.
+
+In this project, FastAPI is the producer. Kafka UI acted as a simple local consumer and inspection tool.
+
+## Why did Kafka need different internal and external listeners?
+
+When I first tested the Python producer from PowerShell, the producer timed out while fetching Kafka metadata. The issue was that Kafka was advertising the internal Docker address `kafka:9092`, which works for containers but not for programs running directly on the host machine.
+
+I fixed this by configuring two listeners:
+
+```text
+INTERNAL: kafka:9092
+EXTERNAL: localhost:29092
+```
+
+The API container uses `kafka:9092`, while local Python scripts use `localhost:29092`.
+
+This taught me that service addresses depend on where the client is running. `localhost` from my laptop and `localhost` from inside a container are not the same thing.
+
+## How did I make the Kafka integration optional?
+
+The Kafka producer reads the broker address from the `KAFKA_BOOTSTRAP_SERVERS` environment variable. If the variable is missing, the function returns `False` and does not publish anything.
+
+This is intentional because the prediction API should still work when Kafka is not configured, especially during local tests or partial deployments.
+
+I added a unit test to verify this behavior.
+
+## How did I verify Kafka end to end?
+
+I first created the `prediction-events` topic in Kafka UI and produced a manual test message. Then I tested the Python producer directly from PowerShell. Finally, I connected FastAPI to Kafka through Docker Compose by setting:
+
+```text
+KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+```
+
+After calling `/predict` through Swagger, Kafka UI showed a new `prediction_created` event in the `prediction-events` topic. This confirmed that the API, Kafka producer, broker, topic, and UI were connected correctly.
+
 ## How did I start using Kubernetes?
 
 I added a minimal Kubernetes configuration for the FastAPI inference service. The goal was not to train the model on Kubernetes, but to describe how the already containerized API could be deployed and exposed in a cluster.

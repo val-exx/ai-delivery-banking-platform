@@ -4,7 +4,7 @@ This module implements the first stages of an end-to-end credit risk machine lea
 
 ## Current Scope
 
-The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Docker Compose orchestration, and basic Kubernetes deployment manifests.
+The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Kafka prediction events, Docker Compose orchestration, and basic Kubernetes deployment manifests.
 
 Implemented features:
 
@@ -22,6 +22,8 @@ Implemented features:
 - FastAPI prediction service;
 - automated API tests;
 - PostgreSQL-backed prediction audit trail;
+- Kafka prediction event publishing;
+- Kafka UI for local topic and message inspection;
 - Docker Compose orchestration for the API and database;
 - database health checks to coordinate service startup;
 - Kubernetes `Deployment` and `Service` manifests for the API;
@@ -162,9 +164,9 @@ http://127.0.0.1:8001/docs
 
 The container includes the trained `baseline_logistic_regression.joblib` model artifact and serves predictions through the `/predict` endpoint.
 
-## Docker Compose and Prediction Auditing
+## Docker Compose, Prediction Auditing, and Kafka Events
 
-The API and PostgreSQL database can be run together with Docker Compose:
+The API, PostgreSQL database, Kafka broker, and Kafka UI can be run together with Docker Compose:
 
 ```powershell
 docker compose up --build
@@ -176,9 +178,99 @@ http://127.0.0.1:8001/docs
 ```
 The API container receives the database connection string through the `DATABASE_URL` environment variable. Inside the Docker Compose network, the API connects to PostgreSQL using the service name `db`.
 
+The API container also receives Kafka configuration through:
+
+```yaml
+KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+```
+
+Inside Docker Compose, the API connects to Kafka using the service name `kafka`.
+
 Each successful `/predict` request is stored in the `prediction_audit` table. The audit record includes the input features, predicted default probability, predicted label, decision threshold, and creation timestamp.
 
+Each successful `/predict` request also publishes a Kafka event to the `prediction-events` topic when Kafka is configured. This makes the prediction available to downstream systems without tightly coupling those systems to the API.
+
 PostgreSQL exposes a health check based on `pg_isready`. Docker Compose starts the API only after the database service becomes healthy.
+
+### Kafka Setup
+
+Kafka is used as an event broker. In this project, the FastAPI service acts as a Kafka producer:
+
+```text
+POST /predict
+  -> FastAPI computes prediction
+  -> PostgreSQL stores audit record
+  -> Kafka receives prediction_created event
+  -> downstream consumers can read the event
+```
+
+The local topic is:
+
+```text
+prediction-events
+```
+
+Kafka UI is available at:
+
+```text
+http://127.0.0.1:8082
+```
+
+Kafka uses two listeners in Docker Compose:
+
+| Listener | Address | Used by |
+| --- | --- | --- |
+| `INTERNAL` | `kafka:9092` | Containers inside Docker Compose |
+| `EXTERNAL` | `localhost:29092` | Python scripts or tools running from the host machine |
+
+This distinction matters because `localhost` means different things depending on where the code runs. From the API container, `localhost` would mean the API container itself, not Kafka. Therefore, the API uses `kafka:9092`.
+
+### Kafka Event Schema
+
+The API publishes events similar to:
+
+```json
+{
+  "event_id": "prediction-<uuid>",
+  "event_type": "prediction_created",
+  "application": {
+    "age": 42,
+    "annual_income": 38000,
+    "employment_years": 6,
+    "loan_amount": 22000,
+    "loan_term_months": 60,
+    "credit_score": 540,
+    "existing_debt": 11000,
+    "debt_to_income": 0.2894736842105263
+  },
+  "default_probability": 0.4299264096226507,
+  "default_label": 1,
+  "threshold": 0.3
+}
+```
+
+The Kafka integration is optional. If `KAFKA_BOOTSTRAP_SERVERS` is not configured, `publish_prediction_event` returns `False` and the API can still serve predictions.
+
+### Manual Kafka Producer Test
+
+From the host machine, Kafka can be tested with:
+
+```powershell
+$env:PYTHONPATH="credit-risk-mlops/src"
+python -c "from credit_risk_mlops.events import publish_prediction_event; print(publish_prediction_event(event={'event_id':'manual-python-test-1','event_type':'manual_python_test','message':'Kafka producer works from Python'}, bootstrap_servers='localhost:29092'))"
+```
+
+Expected result:
+
+```text
+True
+```
+
+The message can then be inspected in Kafka UI under:
+
+```text
+local -> Topics -> prediction-events -> Messages
+```
 
 ## Kubernetes Manifests
 
@@ -345,6 +437,11 @@ python -m unittest discover -s credit-risk-mlops/tests
 - PostgreSQL
 - SQLAlchemy
 - psycopg
+- Kafka
+- kafka-python
+- Kafka UI
+- event-driven architecture
+- producer events
 - Docker Compose
 - service health checks
 - prediction audit logging
