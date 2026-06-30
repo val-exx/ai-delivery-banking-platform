@@ -377,6 +377,42 @@ The monitoring job is written with standard PySpark APIs, so the core aggregatio
 
 In a managed environment, the platform would usually provide the Spark cluster, Java runtime, job scheduler, secrets management, and storage integration. The project keeps those operational concerns local and lightweight while preserving the transferable Spark DataFrame logic.
 
+## Agentic Monitoring Assistant
+
+The module includes a small deterministic monitoring assistant that reads the Spark metrics report and recommends follow-up actions.
+
+```text
+metrics.json
+  -> load_metrics
+  -> assess_metrics
+  -> format_report
+  -> risk level and recommended actions
+```
+
+Run it after generating monitoring metrics:
+
+```powershell
+$env:PYTHONPATH="credit-risk-mlops/src"
+python credit-risk-mlops/scripts/run_monitoring_agent.py
+```
+
+Example output:
+
+```text
+Risk level: critical
+Prediction count: 4
+Default rate: 0.750
+Recommended actions:
+- review recent prediction events
+- check whether the model threshold is too low
+```
+
+This is intentionally simple and deterministic. It models an AgenticOps loop without requiring an LLM:
+
+```text
+observe metrics -> decide risk level -> recommend actions
+```
+
 ## Kubernetes Manifests
 
 This module includes a minimal Kubernetes configuration for the FastAPI inference service:
@@ -553,6 +589,8 @@ python -m unittest discover -s credit-risk-mlops/tests
 - Spark DataFrames
 - data quality filtering
 - Databricks-ready batch monitoring
+- deterministic AgenticOps workflow
+- monitoring recommendations
 - Docker Compose
 - service health checks
 - prediction audit logging
