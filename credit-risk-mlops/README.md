@@ -550,6 +550,24 @@ This is an image visibility issue between the local Docker image store and the K
 
 After switching to GHCR, the Pod reached `ImagePullBackOff` with `401 Unauthorized`. This meant Kubernetes could find the registry image, but it was trying to pull it anonymously. The issue was solved by creating a Kubernetes Docker registry secret and referencing it with `imagePullSecrets`.
 
+## Production Readiness Notes
+
+This module is designed as a compact end-to-end MLOps project. Some parts are production-like, while others are intentionally simplified to keep the project local and easy to run.
+
+| Area | Implemented | Simplified for this project | Possible next improvement |
+| --- | --- | --- | --- |
+| Data | Synthetic credit applications with reproducible generation | No real banking data or feature store | Add versioned datasets and data quality checks |
+| Model | scikit-learn pipeline, metrics, threshold comparison, saved model artifact | Single baseline model | Add model comparison and calibration |
+| Tracking | MLflow experiment logging | Local SQLite backend | Move tracking backend to managed storage |
+| Serving | FastAPI `/health` and `/predict` endpoints | No authentication or rate limiting | Add auth, request IDs, and structured logs |
+| Audit | PostgreSQL prediction audit trail | Minimal schema | Add migrations and retention policy |
+| Events | Kafka producer and consumer with JSONL event log | Local single-broker Kafka | Use managed Kafka and schema validation |
+| Monitoring | Spark metrics and deterministic AgenticOps recommendations | Batch-only, small local data | Add scheduled jobs and historical trend comparison |
+| Deployment | Docker Compose and Kubernetes manifests | Local Docker Desktop setup | Add environment-specific configs and observability |
+| CI | GitHub Actions test workflow | No Docker/Kafka integration tests in CI | Add separate integration test workflow |
+
+The current scope demonstrates the full lifecycle from data generation to model serving, event-driven monitoring, and automated tests. Production hardening would mainly focus on security, observability, data governance, model governance, and deployment operations.
+
 ## Run Tests
 
 ```powershell
