@@ -27,8 +27,15 @@ def load_prediction_events(spark: SparkSession, input_path: str | Path) -> DataF
 
 
 def compute_prediction_metrics(events_df: DataFrame) -> DataFrame:
-    """Compute aggregate monitoring metrics from prediction events."""
-    return events_df.agg(
+    """Compute aggregate monitoring metrics from valid prediction events."""
+    valid_predictions_df = events_df.filter(
+        (F.col("event_type") == "prediction_created")
+        & F.col("default_probability").isNotNull()
+        & F.col("default_label").isNotNull()
+        & F.col("threshold").isNotNull()
+    )
+
+    return valid_predictions_df.agg(
         F.count("*").alias("prediction_count"),
         F.avg("default_probability").alias("average_default_probability"),
         F.avg("default_label").alias("default_rate"),

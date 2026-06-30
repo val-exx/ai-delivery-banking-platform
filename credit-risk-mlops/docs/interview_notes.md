@@ -140,6 +140,23 @@ KAFKA_BOOTSTRAP_SERVERS=kafka:9092
 
 After calling `/predict` through Swagger, Kafka UI showed a new `prediction_created` event in the `prediction-events` topic. This confirmed that the API, Kafka producer, broker, topic, and UI were connected correctly.
 
+## How did I connect Kafka events to monitoring?
+
+I added a Kafka consumer that reads messages from the `prediction-events` topic and appends them to a JSON Lines file. This creates a bridge between online prediction serving and batch monitoring:
+
+```text
+FastAPI /predict
+  -> Kafka prediction event
+  -> Kafka consumer
+  -> prediction_events.jsonl
+  -> Spark monitoring job
+  -> metrics.json
+```
+
+The consumer runs from the host machine and connects to Kafka through `localhost:29092`. The API container instead uses `kafka:9092`, because it runs inside the Docker Compose network.
+
+I also fixed a JSONL edge case: if the existing file did not end with a newline, the next event could be appended to the same line and corrupt the one-event-per-line format. The writer now checks the last byte and adds a newline before appending when needed.
+
 ## How did I use Spark?
 
 I added a PySpark batch monitoring job for prediction events. The job reads prediction events from a JSON Lines file, loads them into a Spark DataFrame, computes aggregate monitoring metrics, and writes a small JSON report.
@@ -152,6 +169,21 @@ The metrics include:
 - average decision threshold.
 
 This simulates a Databricks-style monitoring workflow where production prediction logs could be processed on a schedule.
+
+## How did I make the monitoring more robust?
+
+After consuming a manual Kafka test message, I noticed that not every event in the JSONL file was a valid model prediction. Some events may be operational tests or malformed records.
+
+I updated the Spark monitoring job to aggregate only valid prediction events:
+
+```text
+event_type == prediction_created
+default_probability is not null
+default_label is not null
+threshold is not null
+```
+
+This prevents unrelated events from contaminating model monitoring metrics. I added a unit test that mixes a valid prediction event with a manual test event and verifies that only the prediction event is counted.
 
 ## Why did Spark require Java?
 

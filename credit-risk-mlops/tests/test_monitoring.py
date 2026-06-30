@@ -72,3 +72,32 @@ class PredictionMonitoringTest(unittest.TestCase):
         self.assertAlmostEqual(metrics["average_default_probability"], 0.8)
         self.assertAlmostEqual(metrics["default_rate"], 1.0)
         self.assertAlmostEqual(metrics["average_threshold"], 0.3)
+
+    def test_ignores_non_prediction_events_when_computing_metrics(self) -> None:
+        events_df = self.spark.createDataFrame(
+            [
+                {
+                    "event_id": "prediction-1",
+                    "event_type": "prediction_created",
+                    "default_probability": 0.8,
+                    "default_label": 1,
+                    "threshold": 0.3,
+                    "message": None,
+                },
+                {
+                    "event_id": "manual-test",
+                    "event_type": "manual_python_test",
+                    "default_probability": None,
+                    "default_label": None,
+                    "threshold": None,
+                    "message": "Kafka producer works from Python",
+                },
+            ]
+        )
+
+        metrics = compute_prediction_metrics(events_df).collect()[0].asDict()
+
+        self.assertEqual(metrics["prediction_count"], 1)
+        self.assertAlmostEqual(metrics["average_default_probability"], 0.8)
+        self.assertAlmostEqual(metrics["default_rate"], 1.0)
+        self.assertAlmostEqual(metrics["average_threshold"], 0.3)

@@ -1,3 +1,5 @@
 {"event_id":"prediction-1","event_type":"prediction_created","default_probability":0.8,"default_label":1,"threshold":0.3}
 {"event_id":"prediction-2","event_type":"prediction_created","default_probability":0.2,"default_label":0,"threshold":0.3}
 {"event_id":"prediction-3","event_type":"prediction_created","default_probability":0.4,"default_label":1,"threshold":0.3}
+{"event_id": "manual-python-test-1", "event_type": "manual_python_test", "message": "Kafka producer works from Python"}
+{"event_id": "prediction-4", "event_type": "prediction_created", "application": {"age": 42, "annual_income": 52000.0, "employment_years": 8, "loan_amount": 18000.0, "loan_term_months": 48, "credit_score": 610, "existing_debt": 9000.0, "debt_to_income": 0.1730769231}, "default_probability": 0.5072844852144953, "default_label": 1, "threshold": 0.3}

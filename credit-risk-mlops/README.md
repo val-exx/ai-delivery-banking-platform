@@ -4,7 +4,7 @@ This module implements the first stages of an end-to-end credit risk machine lea
 
 ## Current Scope
 
-The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Kafka prediction events, Spark-based monitoring metrics, Docker Compose orchestration, and basic Kubernetes deployment manifests.
+The current version covers synthetic data generation, EDA, baseline model training, experiment tracking, model persistence, inference, a FastAPI prediction service, PostgreSQL-backed prediction auditing, Kafka prediction events, Kafka event consumption, Spark-based monitoring metrics, Docker Compose orchestration, and basic Kubernetes deployment manifests.
 
 Implemented features:
 
@@ -23,6 +23,7 @@ Implemented features:
 - automated API tests;
 - PostgreSQL-backed prediction audit trail;
 - Kafka prediction event publishing;
+- Kafka consumer for persisting prediction events to JSON Lines;
 - Kafka UI for local topic and message inspection;
 - Spark batch monitoring job for prediction events;
 - Docker Compose orchestration for the API and database;
@@ -273,6 +274,28 @@ The message can then be inspected in Kafka UI under:
 local -> Topics -> prediction-events -> Messages
 ```
 
+### Kafka Consumer to JSON Lines
+
+The project also includes a small Kafka consumer that reads events from the `prediction-events` topic and appends them to a JSON Lines file:
+
+```text
+Kafka topic prediction-events
+  -> consume_events.py
+  -> credit-risk-mlops/data/events/prediction_events.jsonl
+  -> Spark monitoring job
+```
+
+From the host machine, after producing one or more `/predict` requests:
+
+```powershell
+$env:PYTHONPATH="credit-risk-mlops/src"
+python credit-risk-mlops/scripts/consume_events.py --max-messages 1
+```
+
+The consumer uses `localhost:29092` because it runs from the host machine, outside the Docker Compose network.
+
+The JSON Lines writer guarantees that every consumed event starts on a new line, even when the existing file does not end with a trailing newline. This matters because Spark expects one JSON object per line when reading JSONL event logs.
+
 ## Spark Monitoring Job
 
 The module includes a PySpark batch job that computes monitoring metrics from prediction events stored as JSON Lines.
@@ -308,13 +331,24 @@ The job computes:
 | `default_rate` | Average predicted default label |
 | `average_threshold` | Average decision threshold |
 
+Before aggregating, the Spark job filters the input and keeps only valid prediction events:
+
+```text
+event_type == prediction_created
+default_probability is not null
+default_label is not null
+threshold is not null
+```
+
+This prevents manual Kafka test messages or malformed events from contaminating the monitoring metrics.
+
 Example output:
 
 ```json
 {
-  "prediction_count": 3,
-  "average_default_probability": 0.4666666666666666,
-  "default_rate": 0.6666666666666666,
+  "prediction_count": 4,
+  "average_default_probability": 0.4768211213036238,
+  "default_rate": 0.75,
   "average_threshold": 0.3
 }
 ```
@@ -499,8 +533,11 @@ python -m unittest discover -s credit-risk-mlops/tests
 - Kafka UI
 - event-driven architecture
 - producer events
+- consumer events
+- JSON Lines event logs
 - PySpark
 - Spark DataFrames
+- data quality filtering
 - Databricks-ready batch monitoring
 - Docker Compose
 - service health checks
