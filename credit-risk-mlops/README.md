@@ -363,6 +363,20 @@ PySpark requires Java. Local testing used Temurin JDK 17. The code sets `PYSPARK
 
 On Windows, Spark/Hadoop local JSON writing can fail with `NativeIO$Windows.access0`. To keep the local job reliable, Spark computes the metrics and Python writes the final small `metrics.json` report.
 
+### Managed Spark / Databricks Readiness
+
+The monitoring job is written with standard PySpark APIs, so the core aggregation logic can move from local execution to a managed Spark platform such as Databricks.
+
+| Local project component | Managed Spark equivalent |
+| --- | --- |
+| `prediction_events.jsonl` | Cloud object storage path or Delta table |
+| `run_monitoring.py` | Databricks Job or notebook task |
+| `create_spark_session()` | Spark session provided by the platform |
+| `metrics.json` | Delta table, dashboard source, or exported report |
+| PowerShell command | Scheduled workflow |
+
+In a managed environment, the platform would usually provide the Spark cluster, Java runtime, job scheduler, secrets management, and storage integration. The project keeps those operational concerns local and lightweight while preserving the transferable Spark DataFrame logic.
+
 ## Kubernetes Manifests
 
 This module includes a minimal Kubernetes configuration for the FastAPI inference service:
