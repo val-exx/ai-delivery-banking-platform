@@ -43,4 +43,4 @@ ruff check .
 
 ## Portfolio Timeline
 
-The recommended timeline is 8 weeks, with week 9 as buffer for polish, deployment, and interview preparation. See [docs/roadmap.md](docs/roadmap.md).
+The recommended timeline is 8 weeks, with week 9 as buffer for polish, deployment, and technical documentation. See [docs/roadmap.md](docs/roadmap.md).
