@@ -11,6 +11,7 @@ Implemented features:
 - synthetic banking document collection;
 - keyword-based retrieval with stopword filtering;
 - grounded answer builder with citations;
+- optional LLM adapter with deterministic fallback;
 - fallback response when no relevant source is found;
 - retrieval evaluation set;
 - automated tests for retrieval, answering, pipeline behavior, guardrails, and evaluation.
@@ -21,6 +22,7 @@ Implemented features:
 user question
   -> load banking documents
   -> retrieve relevant documents
+  -> optional LLM answer generation
   -> build grounded answer
   -> return answer + citations
 ```
@@ -62,9 +64,12 @@ The retrieval implementation is simple on purpose. It tokenizes text, removes co
 
 This is not semantic search yet. A later version can replace keyword retrieval with embeddings and a vector store while keeping the same pipeline shape.
 
+The LLM integration is also intentionally provider-agnostic. The pipeline accepts an optional `llm_function`, which can generate the answer from the query and retrieved documents. If no function is provided, the system uses the deterministic answer builder.
+
+This keeps the RAG pipeline testable without API keys or network calls, while leaving a clear integration point for a real LLM provider later.
+
 ## Next Steps
 
-- add an optional LLM answer generator;
 - introduce a small LangGraph workflow;
 - add stronger guardrails;
 - add PostgreSQL or MongoDB-backed tools;
@@ -77,5 +82,6 @@ This is not semantic search yet. A later version can replace keyword retrieval w
 - citations
 - grounding
 - guardrails
+- optional LLM adapter
 - automated RAG evaluation
 - testable GenAI service design

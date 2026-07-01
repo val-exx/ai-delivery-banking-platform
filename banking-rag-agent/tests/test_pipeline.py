@@ -29,3 +29,17 @@ class PipelineTest(unittest.TestCase):
 
         self.assertIn("could not find relevant", response["answer"])
         self.assertEqual(response["citations"], [])
+
+    def test_answers_question_with_optional_llm_function(self) -> None:
+        def fake_llm(query, documents):
+            return "Generated answer from optional LLM."
+
+        response = answer_question(
+            query="What is required for a personal loan?",
+            documents_path=DOCUMENTS_PATH,
+            top_k=1,
+            llm_function=fake_llm,
+        )
+
+        self.assertEqual(response["answer"], "Generated answer from optional LLM.")
+        self.assertEqual(response["citations"][0]["doc_id"], "DOC-003")

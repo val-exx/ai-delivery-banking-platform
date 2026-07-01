@@ -32,3 +32,28 @@ class AnsweringTest(unittest.TestCase):
 
         self.assertIn("could not find relevant", response["answer"])
         self.assertEqual(response["citations"], [])
+
+    def test_uses_llm_answer_when_function_is_provided(self) -> None:
+        def fake_llm(query, documents):
+            return "Generated LLM answer grounded in retrieved documents."
+
+        documents = [
+            {
+                "doc_id": "DOC-003",
+                "title": "Personal Loan Requirements",
+                "text": "Personal loan applications require proof of income.",
+                "score": 3,
+            }
+        ]
+
+        response = build_answer(
+            query="What is required for a personal loan?",
+            retrieved_documents=documents,
+            llm_function=fake_llm,
+        )
+
+        self.assertEqual(
+            response["answer"],
+            "Generated LLM answer grounded in retrieved documents.",
+        )
+        self.assertEqual(response["citations"][0]["doc_id"], "DOC-003")
