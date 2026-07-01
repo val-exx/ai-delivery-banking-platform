@@ -8,7 +8,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      PYTHONPATH: credit-risk-mlops/src
+      PYTHONPATH: credit-risk-mlops/src:banking-rag-agent/src
 
     steps:
       - name: Checkout
@@ -35,3 +35,6 @@ jobs:
 
       - name: Test credit risk MLOps
         run: python -m unittest discover -s credit-risk-mlops/tests
+
+      - name: Test banking RAG agent
+        run: python -m unittest discover -s banking-rag-agent/tests

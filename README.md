@@ -28,7 +28,7 @@ This portfolio is designed to demonstrate:
 | --- | --- |
 | `agenticops-toolkit` | In progress |
 | `credit-risk-mlops` | MVP complete |
-| `banking-rag-agent` | Next |
+| `banking-rag-agent` | In progress |
 | `customer-intelligence-streaming` | Planned |
 
 ## Suggested Local Workflow
