@@ -2,7 +2,7 @@
 
 This module implements a small, testable Retrieval-Augmented Generation workflow for synthetic banking documents.
 
-The current version is intentionally deterministic: it does not call an LLM yet. The goal is to make retrieval, grounding, citations, guardrails, and evaluation clear before adding LangGraph or model calls.
+The current version is intentionally deterministic: it does not call a real LLM provider yet. The goal is to make retrieval, grounding, citations, guardrails, evaluation, and graph orchestration clear before adding external model calls.
 
 ## Current Scope
 
@@ -13,6 +13,7 @@ Implemented features:
 - grounded answer builder with citations;
 - optional LLM adapter with deterministic fallback;
 - LangGraph-style workflow with explicit retrieve, answer, and validate nodes;
+- real LangGraph workflow using the same node logic;
 - fallback response when no relevant source is found;
 - retrieval evaluation set;
 - automated tests for retrieval, answering, pipeline behavior, guardrails, and evaluation.
@@ -36,6 +37,16 @@ state
   -> answer_node
   -> validate_node
   -> response
+```
+
+Real LangGraph workflow:
+
+```text
+START
+  -> retrieve
+  -> answer
+  -> validate
+  -> END
 ```
 
 Evaluation flow:
@@ -85,6 +96,15 @@ Citations:
 - DOC-003: Personal Loan Requirements
 ```
 
+## Run LangGraph Workflow
+
+```powershell
+$env:PYTHONPATH="banking-rag-agent/src"
+python banking-rag-agent/scripts/run_langgraph.py "What is required for a personal loan?"
+```
+
+This runs the same RAG nodes through a compiled LangGraph `StateGraph`.
+
 ## Design Notes
 
 The retrieval implementation is simple on purpose. It tokenizes text, removes common stopwords, and scores documents by useful word overlap.
@@ -95,11 +115,10 @@ The LLM integration is also intentionally provider-agnostic. The pipeline accept
 
 This keeps the RAG pipeline testable without API keys or network calls, while leaving a clear integration point for a real LLM provider later.
 
-The graph workflow is also intentionally implemented without the LangGraph dependency at this stage. It uses the same node shape that a LangGraph version would use, but keeps orchestration manual until the control flow is clear.
+The graph workflow was first implemented manually to make the node/state pattern clear. The real LangGraph workflow reuses the same node logic and moves orchestration to a compiled `StateGraph`.
 
 ## Next Steps
 
-- replace the manual graph runner with real LangGraph;
 - add stronger guardrails;
 - add PostgreSQL or MongoDB-backed tools;
 - expand the evaluation set.
@@ -113,5 +132,6 @@ The graph workflow is also intentionally implemented without the LangGraph depen
 - guardrails
 - optional LLM adapter
 - LangGraph-style orchestration
+- LangGraph StateGraph workflow
 - automated RAG evaluation
 - testable GenAI service design
